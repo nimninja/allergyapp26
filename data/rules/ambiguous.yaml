@@ -1,0 +1,28 @@
+# Terms that often need manual verification for vegan/vegetarian labeling.
+vegan_ambiguous:
+  - term: natural flavors
+    reason: Source is not always disclosed; may be animal-derived.
+  - term: natural flavour
+    reason: Source is not always disclosed; may be animal-derived.
+  - term: monoglycerides
+    reason: Mono- and diglycerides may be animal or plant-sourced.
+  - term: diglycerides
+    reason: Mono- and diglycerides may be animal or plant-sourced.
+  - term: glycerin
+    reason: Glycerin can be plant or animal-derived unless specified.
+  - term: glycerol
+    reason: Glycerol can be plant or animal-derived unless specified.
+  - term: riboflavin
+    reason: May be produced from various sources; check with manufacturer.
+  - term: vitamin d
+    reason: D3 is often lanolin (sheep); D2 is often vegan—verify product.
+
+vegetarian_ambiguous:
+  - term: rennet
+    reason: May be animal, microbial, or vegetarian—verify packaging.
+  - term: lipase
+    reason: Enzyme source varies; some vegetarians avoid animal-derived.
+  - term: monoglycerides
+    reason: May be animal or plant-sourced unless stated.
+  - term: diglycerides
+    reason: May be animal or plant-sourced unless stated.

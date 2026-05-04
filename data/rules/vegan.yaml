@@ -1,0 +1,42 @@
+# Ingredients that typically violate a vegan diet (keyword heuristic).
+violation_keywords:
+  - milk
+  - dairy
+  - whey
+  - casein
+  - lactose
+  - butter
+  - cream
+  - cheese
+  - yogurt
+  - yoghurt
+  - egg
+  - eggs
+  - albumin
+  - honey
+  - beeswax
+  - gelatin
+  - gelatine
+  - carmine
+  - cochineal
+  - shellac
+  - lard
+  - tallow
+  - suet
+  - rennet
+  - anchovy
+  - anchovies
+  - fish
+  - chicken
+  - beef
+  - pork
+  - turkey
+  - duck
+  - meat
+  - bacon
+  - ham
+  - sausage
+  - collagen
+  - keratin
+  - isinglass
+  - vitamin d3

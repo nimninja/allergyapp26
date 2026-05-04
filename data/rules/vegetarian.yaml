@@ -1,0 +1,34 @@
+# Ingredients that typically violate a lacto-ovo vegetarian diet (meat/fish; some animal additives).
+violation_keywords:
+  - beef
+  - pork
+  - chicken
+  - turkey
+  - duck
+  - lamb
+  - veal
+  - meat
+  - bacon
+  - ham
+  - prosciutto
+  - pepperoni
+  - salami
+  - sausage
+  - lard
+  - tallow
+  - suet
+  - anchovy
+  - anchovies
+  - fish
+  - salmon
+  - tuna
+  - shrimp
+  - crab
+  - lobster
+  - shellfish
+  - gelatin
+  - gelatine
+  - carmine
+  - cochineal
+  - isinglass
+  - rennet
