@@ -28,8 +28,11 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
             "disclaimer": "This tool is not medical advice.",
         }
 
+    from api.ocr_state import init_ocr_state
+
     api_main.limiter.enabled = False
     api_main.app.state.settings = app_settings
+    init_ocr_state(api_main.app.state)
     api_main.app.state.ocr_reader = object()
     api_main.app.state.ocr_error = None
     monkeypatch.setattr(routes_v1, "scan_label_image", lambda *a, **k: fake_scan())

@@ -4,14 +4,14 @@ Ingredient checker API — production-ready HTTP backend.
 Local dev:
   uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 
-Production (Docker):
-  docker build -t ingredient-checker-api .
-  docker run -p 8000:8000 -e ENV=production ingredient-checker-api
+Production (Docker, 512 MB friendly):
+  OCR_ENGINE=tesseract (default in Dockerfile)
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -26,8 +26,9 @@ from slowapi.middleware import SlowAPIMiddleware
 from api.config import settings
 from api.limiter import limiter
 from api.middleware import RequestContextMiddleware
+from api.ocr_state import _load_backend, health_payload, init_ocr_state
 from api.routes_v1 import router as v1_router
-from src.ocr import get_easyocr_reader
+from src.ocr import ocr_engine
 
 logging.basicConfig(level=settings.log_level)
 logger = logging.getLogger("ingredient_checker")
@@ -35,17 +36,24 @@ logger = logging.getLogger("ingredient_checker")
 _static_dir = Path(__file__).resolve().parent / "static"
 
 
+def _preload_ocr_enabled() -> bool:
+    if os.environ.get("PRELOAD_OCR", "").strip().lower() in {"1", "true", "yes"}:
+        return True
+    # Tesseract is light — safe to init at boot on 512 MB instances.
+    return ocr_engine() == "tesseract"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.settings = settings
-    try:
-        app.state.ocr_reader = get_easyocr_reader()
-        app.state.ocr_error = None
-        logger.info("OCR engine ready")
-    except Exception as exc:
-        app.state.ocr_reader = None
-        app.state.ocr_error = str(exc)
-        logger.exception("OCR engine failed to load")
+    init_ocr_state(app.state)
+    if _preload_ocr_enabled():
+        try:
+            _load_backend(app.state)
+        except Exception:
+            pass  # errors stored on app.state; /health reports degraded
+    else:
+        logger.info("OCR (%s) will load on first /v1/scan", ocr_engine())
     yield
 
 
@@ -82,11 +90,4 @@ def mobile_app() -> FileResponse:
 @app.get("/health")
 def health(request: Request) -> dict[str, Any]:
     """Load balancer health check (not rate limited)."""
-    reader = getattr(request.app.state, "ocr_reader", None)
-    ocr_error = getattr(request.app.state, "ocr_error", None)
-    return {
-        "status": "ok" if reader is not None else "degraded",
-        "ocr_ready": reader is not None,
-        "version": "1.0.0",
-        "ocr_error": ocr_error if reader is None else None,
-    }
+    return health_payload(request.app.state)

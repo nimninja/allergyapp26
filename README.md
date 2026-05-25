@@ -5,7 +5,7 @@ Scan food label photos against allergen and diet rules. Includes a **deployable 
 ## Architecture
 
 ```
-Android app (Kotlin)  ──HTTPS──▶  FastAPI (/v1/*)  ──▶  EasyOCR + YAML rules
+Android app (Kotlin)  ──HTTPS──▶  FastAPI (/v1/*)  ──▶  Tesseract OCR + YAML rules
 Mobile web (/)        ──same API──┘
 Desktop (app.py)      ──local OCR──▶  shared scan_service
 ```
@@ -39,6 +39,7 @@ docker run -p 8000:8000 -e ENV=production ingredient-checker-api
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
+| `OCR_ENGINE` | `tesseract` in Docker | `tesseract` (~512 MB RAM) or `easyocr` (~2 GB) |
 | `ENV` | `development` | Set `production` to hide `/docs` and generic 500 errors |
 | `RATE_LIMIT_ENABLED` | `true` in prod | Per-IP limits on `/v1/scan` |
 | `RATE_LIMIT_SCAN` | `30/minute` | Scan rate limit |

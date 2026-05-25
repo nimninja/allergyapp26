@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from api.config import settings
 from api.limiter import limiter
+from api.ocr_state import get_ocr_reader, health_payload
 from src.constants import ALLERGEN_OPTIONS, DISCLAIMER
 from src.preferences import parse_allergen_ids, parse_extra_avoid
 from src.scan_service import scan_label_image
@@ -13,30 +14,9 @@ from src.scan_service import scan_label_image
 router = APIRouter(prefix="/v1", tags=["v1"])
 
 
-def _ocr_reader(request: Request) -> Any:
-    reader = getattr(request.app.state, "ocr_reader", None)
-    ocr_error = getattr(request.app.state, "ocr_error", None)
-    if reader is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "message": "OCR engine is not available on this server.",
-                "error": ocr_error,
-            },
-        )
-    return reader
-
-
 @router.get("/health")
 def health_v1(request: Request) -> dict[str, Any]:
-    reader = getattr(request.app.state, "ocr_reader", None)
-    ocr_error = getattr(request.app.state, "ocr_error", None)
-    return {
-        "status": "ok" if reader is not None else "degraded",
-        "ocr_ready": reader is not None,
-        "version": "1.0.0",
-        "ocr_error": ocr_error if reader is None else None,
-    }
+    return health_payload(request.app.state)
 
 
 @router.get("/allergens")
@@ -58,7 +38,7 @@ async def scan_v1(
     extra_avoid: str = Form("", description="Additional terms to avoid"),
 ) -> dict[str, Any]:
     app_settings = request.app.state.settings
-    reader = _ocr_reader(request)
+    reader = get_ocr_reader(request)
 
     if not image.content_type or not image.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Upload must be an image file.")

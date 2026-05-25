@@ -1,22 +1,25 @@
-# Render.com — connect repo and deploy as Docker web service.
-# Docs: https://render.com/docs/deploy-fastapi
-
-services:
-  - type: web
-    name: ingredient-checker-api
-    runtime: docker
-    plan: starter
-    healthCheckPath: /health
-    envVars:
-      - key: ENV
-        value: production
-      - key: RATE_LIMIT_ENABLED
-        value: true
-      - key: RATE_LIMIT_SCAN
-        value: 30/minute
-      - key: MAX_UPLOAD_MB
-        value: 10
-      - key: ALLOWED_ORIGINS
-        value: "*"
-      - key: LOG_LEVEL
-        value: INFO
+# Render.com — connect repo and deploy as Docker web service.
+# Docs: https://render.com/docs/deploy-fastapi
+
+services:
+  - type: web
+    name: ingredient-checker-api
+    runtime: docker
+    # API uses Tesseract (OCR_ENGINE=tesseract) — fits 512 MB Free/Starter.
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: OCR_ENGINE
+        value: tesseract
+      - key: ENV
+        value: production
+      - key: RATE_LIMIT_ENABLED
+        value: true
+      - key: RATE_LIMIT_SCAN
+        value: 30/minute
+      - key: MAX_UPLOAD_MB
+        value: 10
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: LOG_LEVEL
+        value: INFO
