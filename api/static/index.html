@@ -226,28 +226,133 @@
       return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
     }
 
+    function formatApiError(res, data) {
+      if (typeof data.detail === "string" && data.detail) return data.detail;
+      if (Array.isArray(data.detail)) {
+        return data.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+      }
+      if (data.detail && typeof data.detail === "object") {
+        const inner = data.detail.message || data.detail.error;
+        if (typeof inner === "string" && inner) return inner;
+        const s = JSON.stringify(data.detail);
+        if (s && s !== "{}") return s;
+      }
+      if (data.message) return String(data.message);
+      if (data.error) return String(data.error);
+      if (res.status === 413) return "Image too large. Try a closer photo or use Choose image.";
+      if (res.status === 429) return "Too many scans. Wait a minute and try again.";
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        return "Server busy or waking up. Wait 30 seconds and tap Analyze again.";
+      }
+      if (res.status >= 500) return "Server error (" + res.status + "). Try again.";
+      if (res.status === 0) return "Network error. Check connection or try Wi‑Fi.";
+      const body = Object.keys(data).length ? JSON.stringify(data) : "";
+      if (body && body !== "{}") return body;
+      return res.statusText || "Request failed (" + res.status + "). Try again.";
+    }
+
+    async function wakeServer() {
+      try {
+        await fetch("/health", { cache: "no-store" });
+      } catch (_) { /* ignore */ }
+    }
+
+    /** Resize phone camera photos before upload (avoids 413/timeouts on cellular). */
+    async function prepareImageForUpload(file) {
+      const maxSide = 1600;
+      const maxBytes = 2 * 1024 * 1024;
+      // Phone camera JPEGs are often huge — always compress when large or HEIC.
+      if (
+        file.size <= 900 * 1024 &&
+        !/heic|heif/i.test(file.name || "") &&
+        !/heic|heif/i.test(file.type || "")
+      ) {
+        return file;
+      }
+      const url = URL.createObjectURL(file);
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error("Could not read image. Try Choose image instead of camera."));
+          el.src = url;
+        });
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        const scale = Math.min(1, maxSide / Math.max(w, h));
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.85)
+        );
+        if (!blob) throw new Error("Could not compress image.");
+        return new File([blob], "label.jpg", { type: "image/jpeg" });
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
     scanBtn.addEventListener("click", async () => {
       if (!imageFile) return;
       scanBtn.disabled = true;
-      statusEl.innerHTML = '<span class="spinner"></span>Reading label… first scan can take 20–40s';
+      statusEl.innerHTML = '<span class="spinner"></span>Waking server…';
       try {
+        await wakeServer();
+        statusEl.innerHTML = '<span class="spinner"></span>Reading label… may take 15–40s';
+        const uploadFile = await prepareImageForUpload(imageFile);
         const form = new FormData();
-        form.append("image", imageFile, imageFile.name || "label.jpg");
+        form.append("image", uploadFile, uploadFile.name || "label.jpg");
         form.append("allergens", selectedAllergens().join(","));
-        form.append("vegan", document.getElementById("vegan").checked);
-        form.append("vegetarian", document.getElementById("vegetarian").checked);
+        form.append("vegan", document.getElementById("vegan").checked ? "true" : "false");
+        form.append("vegetarian", document.getElementById("vegetarian").checked ? "true" : "false");
         form.append("extra_avoid", document.getElementById("extraAvoid").value);
 
-        const res = await fetch("/v1/scan", { method: "POST", body: form });
-        const data = await res.json().catch(() => ({}));
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 120000);
+        const res = await fetch("/v1/scan", {
+          method: "POST",
+          body: form,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        const raw = await res.text();
+        let data = {};
+        if (raw) {
+          try {
+            data = JSON.parse(raw);
+          } catch {
+            throw new Error(
+              res.ok
+                ? "Invalid response from server."
+                : "Server returned non-JSON (" + res.status + "). Try again."
+            );
+          }
+        }
         if (!res.ok) {
-          const msg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data);
-          throw new Error(msg || res.statusText);
+          throw new Error(formatApiError(res, data));
+        }
+        if (!data.summary) {
+          throw new Error("Empty scan result. Wait 30s and try again (server may be starting).");
         }
         renderResults(data);
         statusEl.textContent = "Done.";
       } catch (err) {
-        statusEl.textContent = "Error: " + (err.message || String(err));
+        let msg;
+        if (err && err.name === "AbortError") {
+          msg = "Timed out after 2 minutes. Wait 30s, then try again on Wi‑Fi.";
+        } else if (err instanceof Error && err.message) {
+          msg = err.message;
+        } else if (typeof err === "string") {
+          msg = err;
+        } else {
+          msg = "Could not complete scan. If the app was idle, open the page, wait 30s, then retry.";
+        }
+        statusEl.textContent = "Error: " + msg;
       } finally {
         scanBtn.disabled = !imageFile;
       }

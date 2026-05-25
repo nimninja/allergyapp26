@@ -1,5 +1,6 @@
 """Versioned public API routes for mobile and third-party clients."""
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
@@ -58,7 +59,9 @@ async def scan_v1(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        return scan_label_image(
+        # Tesseract is CPU-heavy; run off the event loop so /health stays responsive.
+        return await asyncio.to_thread(
+            scan_label_image,
             data,
             selected_allergens=selected,
             vegan=vegan,
