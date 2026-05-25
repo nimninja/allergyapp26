@@ -25,7 +25,7 @@ def get_easyocr_reader():
 def extract_text_from_image(image_bytes: bytes, reader=None) -> str:
     """
     Run OCR on image bytes and return newline-joined text lines in reading order.
-    Pass ``reader`` to reuse a cached Reader instance (e.g. from Streamlit cache).
+    Pass ``reader`` to reuse a cached Reader instance (e.g. from the desktop app).
     """
     if reader is None:
         reader = get_easyocr_reader()

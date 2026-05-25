@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.git/
+.gitignore
+*.md
+app.py
+tests/
+android/
+.gradle/
+.idea/
+*.pyc
+.env
+.env.*

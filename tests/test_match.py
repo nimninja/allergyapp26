@@ -4,14 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from src.match import load_default_rules_dir, match_text, normalize_text
-
-
-@pytest.fixture
-def rules_dir() -> Path:
-    return load_default_rules_dir()
+from src.match import match_text, normalize_text
 
 
 def test_normalize_text_collapses_whitespace_and_lower() -> None:

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a5f4a" />
+  <title>Ingredient checker</title>
+  <style>
+    :root {
+      --bg: #f4f6f5;
+      --card: #fff;
+      --accent: #1a5f4a;
+      --danger: #c0392b;
+      --warn: #b8860b;
+      --ok: #27ae60;
+      --muted: #666;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: #222;
+      line-height: 1.45;
+      padding: 0 0 2rem;
+    }
+    header {
+      background: var(--accent);
+      color: #fff;
+      padding: 1rem 1rem 1.25rem;
+    }
+    header h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+    header p { margin: 0.35rem 0 0; font-size: 0.85rem; opacity: 0.9; }
+    main { padding: 1rem; max-width: 32rem; margin: 0 auto; }
+    section {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+    .checks label {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.45rem 0;
+      font-size: 0.95rem;
+    }
+    .checks input { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
+    textarea {
+      width: 100%;
+      min-height: 4rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 0.6rem;
+      font: inherit;
+      resize: vertical;
+    }
+    .disclaimer { font-size: 0.75rem; color: var(--muted); }
+    .preview {
+      width: 100%;
+      max-height: 220px;
+      object-fit: contain;
+      background: #222;
+      border-radius: 8px;
+      display: none;
+    }
+    .preview.show { display: block; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    button, .file-btn {
+      flex: 1;
+      min-width: 7rem;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .file-btn {
+      display: inline-block;
+      text-align: center;
+      background: #e8ecea;
+      color: #222;
+    }
+    .file-btn input { display: none; }
+    #scanBtn {
+      width: 100%;
+      margin-top: 0.75rem;
+      background: var(--accent);
+      color: #fff;
+      font-size: 1.05rem;
+      padding: 1rem;
+    }
+    #scanBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #status { font-size: 0.9rem; color: var(--muted); margin-top: 0.5rem; min-height: 1.2em; }
+    #summary {
+      font-weight: 600;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      display: none;
+    }
+    #summary.show { display: block; }
+    #summary.violation { background: #fdecea; color: var(--danger); }
+    #summary.warning { background: #fff8e6; color: var(--warn); }
+    #summary.ok { background: #e8f8ef; color: var(--ok); }
+    #summary.no_text { background: #fdecea; color: var(--danger); }
+    .result-block { margin: 0.5rem 0; font-size: 0.9rem; }
+    .result-block ul { margin: 0.25rem 0 0; padding-left: 1.2rem; }
+    details { margin-top: 0.75rem; font-size: 0.85rem; }
+    details pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #f0f0f0;
+      padding: 0.6rem;
+      border-radius: 6px;
+      max-height: 12rem;
+      overflow: auto;
+    }
+    .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid #ccc; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -0.15em; margin-right: 0.35rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ingredient checker</h1>
+    <p>Scan a label photo against your restrictions</p>
+  </header>
+  <main>
+    <section>
+      <h2>Your restrictions</h2>
+      <div id="allergenList" class="checks">Loading…</div>
+      <label class="checks"><input type="checkbox" id="vegan" /> Vegan</label>
+      <label class="checks"><input type="checkbox" id="vegetarian" /> Vegetarian</label>
+      <p style="margin:0.75rem 0 0.35rem;font-size:0.9rem;">Also avoid (comma separated)</p>
+      <textarea id="extraAvoid" placeholder="e.g. coconut, mustard"></textarea>
+      <p class="disclaimer" id="disclaimer"></p>
+    </section>
+
+    <section>
+      <h2>Label photo</h2>
+      <img id="preview" class="preview" alt="Label preview" />
+      <div class="btn-row">
+        <label class="file-btn">
+          Take photo
+          <input type="file" id="camera" accept="image/*" capture="environment" />
+        </label>
+        <label class="file-btn">
+          Choose image
+          <input type="file" id="gallery" accept="image/*" />
+        </label>
+      </div>
+      <button type="button" id="scanBtn" disabled>Analyze label</button>
+      <div id="status"></div>
+    </section>
+
+    <section id="resultsSection" style="display:none">
+      <div id="summary"></div>
+      <div id="results"></div>
+    </section>
+  </main>
+
+  <script>
+    let imageFile = null;
+    const preview = document.getElementById("preview");
+    const scanBtn = document.getElementById("scanBtn");
+    const statusEl = document.getElementById("status");
+
+    function selectedAllergens() {
+      return [...document.querySelectorAll("[data-allergen]:checked")].map((el) => el.dataset.allergen);
+    }
+
+    function onImagePick(file) {
+      if (!file) return;
+      imageFile = file;
+      preview.src = URL.createObjectURL(file);
+      preview.classList.add("show");
+      scanBtn.disabled = false;
+      statusEl.textContent = "";
+    }
+
+    document.getElementById("camera").addEventListener("change", (e) => onImagePick(e.target.files[0]));
+    document.getElementById("gallery").addEventListener("change", (e) => onImagePick(e.target.files[0]));
+
+    async function loadAllergens() {
+      const res = await fetch("/v1/allergens");
+      if (!res.ok) throw new Error("Could not load allergens");
+      const data = await res.json();
+      document.getElementById("disclaimer").textContent = data.disclaimer;
+      const list = document.getElementById("allergenList");
+      list.innerHTML = "";
+      for (const a of data.allergens) {
+        const label = document.createElement("label");
+        label.className = "checks";
+        label.innerHTML = `<input type="checkbox" data-allergen="${a.id}" /> ${a.label}`;
+        list.appendChild(label);
+      }
+    }
+
+    function renderResults(data) {
+      document.getElementById("resultsSection").style.display = "block";
+      const summary = document.getElementById("summary");
+      summary.textContent = data.summary;
+      summary.className = "show " + (data.summary_level || "ok");
+
+      const parts = [];
+      if (data.may_contain_notices?.length) {
+        parts.push("<div class='result-block'><strong>May contain / facility</strong><ul>" +
+          data.may_contain_notices.map((m) => `<li>${escapeHtml(m)}</li>`).join("") + "</ul></div>");
+      }
+      if (data.violations?.length) {
+        parts.push("<div class='result-block'><strong>Violations</strong><ul>" +
+          data.violations.map((v) => `<li>${escapeHtml(v.category)}: “${escapeHtml(v.keyword)}”</li>`).join("") + "</ul></div>");
+      }
+      if (data.warnings?.length) {
+        parts.push("<div class='result-block'><strong>Review manually</strong><ul>" +
+          data.warnings.map((w) => `<li>${escapeHtml(w.term)}: ${escapeHtml(w.reason)}</li>`).join("") + "</ul></div>");
+      }
+      parts.push(`<details><summary>OCR text</summary><pre>${escapeHtml(data.raw_text || "")}</pre></details>`);
+      document.getElementById("results").innerHTML = parts.join("");
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    scanBtn.addEventListener("click", async () => {
+      if (!imageFile) return;
+      scanBtn.disabled = true;
+      statusEl.innerHTML = '<span class="spinner"></span>Reading label… first scan can take 20–40s';
+      try {
+        const form = new FormData();
+        form.append("image", imageFile, imageFile.name || "label.jpg");
+        form.append("allergens", selectedAllergens().join(","));
+        form.append("vegan", document.getElementById("vegan").checked);
+        form.append("vegetarian", document.getElementById("vegetarian").checked);
+        form.append("extra_avoid", document.getElementById("extraAvoid").value);
+
+        const res = await fetch("/v1/scan", { method: "POST", body: form });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data);
+          throw new Error(msg || res.statusText);
+        }
+        renderResults(data);
+        statusEl.textContent = "Done.";
+      } catch (err) {
+        statusEl.textContent = "Error: " + (err.message || String(err));
+      } finally {
+        scanBtn.disabled = !imageFile;
+      }
+    });
+
+    loadAllergens().catch((e) => {
+      document.getElementById("allergenList").textContent = "Failed to connect to server.";
+      statusEl.textContent = e.message;
+    });
+  </script>
+</body>
+</html>
