@@ -143,7 +143,7 @@ fun MainScreen(
                         }
                     }
                     if (state.scanning) {
-                        Text("Reading label… first scan can take 20–40 seconds.")
+                        Text("Connecting to server… scan may take 15–40 seconds.")
                     }
                 }
             }

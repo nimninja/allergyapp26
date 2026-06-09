@@ -8,20 +8,21 @@ android {
     namespace = "com.ingredientchecker.app"
     compileSdk = 35
 
+    // Phase 1: all builds talk to deployed Render API (works on emulator + physical phone).
+    val productionApiUrl = "https://allergyapp26.onrender.com"
+
     defaultConfig {
         applicationId = "com.ingredientchecker.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
-        // Release: set your deployed API URL (HTTPS required for Play Store).
-        buildConfigField("String", "API_BASE_URL", "\"https://your-api.onrender.com\"")
+        buildConfigField("String", "API_BASE_URL", "\"$productionApiUrl\"")
     }
 
     buildTypes {
         debug {
-            // Android emulator → host machine localhost
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
+            buildConfigField("String", "API_BASE_URL", "\"$productionApiUrl\"")
             isDebuggable = true
         }
         release {

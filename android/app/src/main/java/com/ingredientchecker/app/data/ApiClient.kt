@@ -14,6 +14,9 @@ import retrofit2.http.Part
 import java.util.concurrent.TimeUnit
 
 interface IngredientApi {
+    @GET("v1/health")
+    suspend fun health(): Map<String, Any?>
+
     @GET("v1/allergens")
     suspend fun getAllergens(): AllergensResponse
 

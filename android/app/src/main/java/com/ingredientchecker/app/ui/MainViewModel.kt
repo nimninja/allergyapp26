@@ -92,6 +92,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(scanning = true, error = null, scanResult = null) }
             try {
+                // Wake Render free tier before upload (same as mobile web).
+                try {
+                    ApiClient.api.health()
+                } catch (_: Exception) {
+                    // Continue — scan may still succeed if server is already warm.
+                }
                 val file = uriToTempFile(uri)
                 val part = MultipartBody.Part.createFormData(
                     "image",
@@ -99,17 +105,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     file.asRequestBody("image/jpeg".toMediaType()),
                 )
                 val r = _state.value.restrictions
+                val textPlain = "text/plain".toMediaType()
                 val result = ApiClient.api.scan(
                     image = part,
-                    allergens = r.selectedAllergens.joinToString(",").toRequestBody("text/plain".toMediaType()),
-                    vegan = r.vegan.toString().toRequestBody("text/plain".toMediaType()),
-                    vegetarian = r.vegetarian.toString().toRequestBody("text/plain".toMediaType()),
-                    extraAvoid = r.extraAvoid.toRequestBody("text/plain".toMediaType()),
+                    allergens = r.selectedAllergens.joinToString(",").toRequestBody(textPlain),
+                    vegan = (if (r.vegan) "true" else "false").toRequestBody(textPlain),
+                    vegetarian = (if (r.vegetarian) "true" else "false").toRequestBody(textPlain),
+                    extraAvoid = r.extraAvoid.toRequestBody(textPlain),
                 )
                 _state.update { it.copy(scanning = false, scanResult = result) }
             } catch (e: Exception) {
+                val msg = when {
+                    e.message?.contains("timeout", ignoreCase = true) == true ->
+                        "Timed out. Wait 30s and try again (server may be waking up)."
+                    e.message?.contains("Unable to resolve host", ignoreCase = true) == true ->
+                        "No internet connection."
+                    else -> e.message ?: "Unknown error"
+                }
                 _state.update {
-                    it.copy(scanning = false, error = "Scan failed: ${e.message}")
+                    it.copy(scanning = false, error = "Scan failed: $msg")
                 }
             }
         }

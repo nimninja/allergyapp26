@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
@@ -37,7 +38,11 @@ class MainActivity : ComponentActivity() {
             IngredientCheckerTheme {
                 MainScreen(
                     viewModel = viewModel,
-                    onPickImage = { pickImage.launch(ActivityResultContracts.PickVisualMedia.ImageOnly) },
+                    onPickImage = {
+                        pickImage.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
                     onTakePhoto = ::startCamera,
                 )
             }
@@ -56,7 +61,7 @@ class MainActivity : ComponentActivity() {
 
     private fun launchCamera() {
         pendingCameraUri = createCameraUri()
-        takePhoto.launch(pendingCameraUri)
+        pendingCameraUri?.let { takePhoto.launch(it) }
     }
 
     private fun createCameraUri(): Uri {
