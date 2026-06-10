@@ -8,15 +8,15 @@ android {
     namespace = "com.ingredientchecker.app"
     compileSdk = 35
 
-    // Phase 1: all builds talk to deployed Render API (works on emulator + physical phone).
+    // Phase 2: on-device ML Kit OCR + bundled rules (no API required for scans).
     val productionApiUrl = "https://allergyapp26.onrender.com"
 
     defaultConfig {
         applicationId = "com.ingredientchecker.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0"
         buildConfigField("String", "API_BASE_URL", "\"$productionApiUrl\"")
     }
 
@@ -69,8 +69,13 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Phase 2: on-device OCR + YAML rules
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("org.yaml:snakeyaml:2.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

@@ -5,26 +5,20 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ingredientchecker.app.data.AllergenOption
-import com.ingredientchecker.app.data.ApiClient
 import com.ingredientchecker.app.data.PreferencesRepository
 import com.ingredientchecker.app.data.ScanResponse
 import com.ingredientchecker.app.data.UserRestrictions
+import com.ingredientchecker.app.domain.AppConstants
+import com.ingredientchecker.app.domain.LocalScanService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.File
-import java.io.FileOutputStream
 
 data class MainUiState(
-    val loadingAllergens: Boolean = true,
     val allergens: List<AllergenOption> = emptyList(),
-    val disclaimer: String = "",
+    val disclaimer: String = AppConstants.DISCLAIMER,
     val restrictions: UserRestrictions = UserRestrictions(),
     val imageUri: Uri? = null,
     val scanning: Boolean = false,
@@ -34,6 +28,7 @@ data class MainUiState(
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = PreferencesRepository(application)
+    private val scanService = LocalScanService(application)
     private val _state = MutableStateFlow(MainUiState())
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
@@ -47,25 +42,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadAllergens() {
-        viewModelScope.launch {
-            _state.update { it.copy(loadingAllergens = true, error = null) }
-            try {
-                val response = ApiClient.api.getAllergens()
-                _state.update {
-                    it.copy(
-                        loadingAllergens = false,
-                        allergens = response.allergens,
-                        disclaimer = response.disclaimer,
-                    )
-                }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        loadingAllergens = false,
-                        error = "Could not reach API: ${e.message}",
-                    )
-                }
-            }
+        val options = AppConstants.ALLERGEN_OPTIONS.map { (id, label) ->
+            AllergenOption(id, label)
+        }
+        _state.update {
+            it.copy(
+                allergens = options,
+                disclaimer = AppConstants.DISCLAIMER,
+                error = null,
+            )
         }
     }
 
@@ -92,36 +77,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(scanning = true, error = null, scanResult = null) }
             try {
-                // Wake Render free tier before upload (same as mobile web).
-                try {
-                    ApiClient.api.health()
-                } catch (_: Exception) {
-                    // Continue — scan may still succeed if server is already warm.
-                }
-                val file = uriToTempFile(uri)
-                val part = MultipartBody.Part.createFormData(
-                    "image",
-                    file.name,
-                    file.asRequestBody("image/jpeg".toMediaType()),
-                )
-                val r = _state.value.restrictions
-                val textPlain = "text/plain".toMediaType()
-                val result = ApiClient.api.scan(
-                    image = part,
-                    allergens = r.selectedAllergens.joinToString(",").toRequestBody(textPlain),
-                    vegan = (if (r.vegan) "true" else "false").toRequestBody(textPlain),
-                    vegetarian = (if (r.vegetarian) "true" else "false").toRequestBody(textPlain),
-                    extraAvoid = r.extraAvoid.toRequestBody(textPlain),
-                )
+                val result = scanService.scan(uri, _state.value.restrictions)
                 _state.update { it.copy(scanning = false, scanResult = result) }
             } catch (e: Exception) {
-                val msg = when {
-                    e.message?.contains("timeout", ignoreCase = true) == true ->
-                        "Timed out. Wait 30s and try again (server may be waking up)."
-                    e.message?.contains("Unable to resolve host", ignoreCase = true) == true ->
-                        "No internet connection."
-                    else -> e.message ?: "Unknown error"
-                }
+                val msg = e.message ?: "Unknown error"
                 _state.update {
                     it.copy(scanning = false, error = "Scan failed: $msg")
                 }
@@ -139,14 +98,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun persist(restrictions: UserRestrictions) {
         viewModelScope.launch { prefs.save(restrictions) }
-    }
-
-    private fun uriToTempFile(uri: Uri): File {
-        val context = getApplication<Application>()
-        val out = File.createTempFile("label_", ".jpg", context.cacheDir)
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            FileOutputStream(out).use { output -> input.copyTo(output) }
-        } ?: throw IllegalArgumentException("Could not read image from URI")
-        return out
     }
 }

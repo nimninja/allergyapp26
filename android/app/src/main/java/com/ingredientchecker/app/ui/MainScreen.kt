@@ -61,11 +61,11 @@ fun MainScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (state.loadingAllergens) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    CircularProgressIndicator()
-                }
-            }
+            Text(
+                "On-device scan — no server needed",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
 
             state.error?.let { msg ->
                 Text(msg, color = MaterialTheme.colorScheme.error)
@@ -143,7 +143,7 @@ fun MainScreen(
                         }
                     }
                     if (state.scanning) {
-                        Text("Connecting to server… scan may take 15–40 seconds.")
+                        Text("Reading label on device… usually a few seconds.")
                     }
                 }
             }

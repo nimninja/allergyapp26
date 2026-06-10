@@ -18,6 +18,8 @@ htmlcov/
 
 # IDE
 .idea/
+!.idea/runConfigurations/
+!.idea/gradle.xml
 .vscode/
 *.swp
 *.swo

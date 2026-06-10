@@ -1,0 +1,169 @@
+# Keywords that suggest presence of each allergen (heuristic; not exhaustive).
+milk:
+  label: Milk / dairy
+  keywords:
+    - milk
+    - dairy
+    - whey
+    - casein
+    - caseinate
+    - lactose
+    - lactalbumin
+    - butter
+    - cream
+    - ghee
+    - yogurt
+    - yoghurt
+    - cheese
+    - curds
+    - buttermilk
+    - skim milk
+    - nonfat milk
+    - milk powder
+    - condensed milk
+    - evaporated milk
+    - sodium caseinate
+    - lactitol
+
+eggs:
+  label: Eggs
+  keywords:
+    - egg
+    - eggs
+    - egg white
+    - egg yolk
+    - albumin
+    - ovalbumin
+    - lysozyme
+    - mayonnaise
+    - meringue
+    - surimi
+
+fish:
+  label: Fish
+  keywords:
+    - fish
+    - anchovy
+    - anchovies
+    - bass
+    - cod
+    - haddock
+    - herring
+    - mackerel
+    - salmon
+    - sardine
+    - sardines
+    - tilapia
+    - tuna
+    - pollack
+    - pollock
+    - halibut
+    - trout
+    - swordfish
+    - mahi
+    - perch
+    - pike
+    - whitefish
+    - roux
+
+shellfish:
+  label: Shellfish
+  keywords:
+    - shrimp
+    - prawn
+    - crab
+    - lobster
+    - crayfish
+    - crawfish
+    - scallop
+    - scallops
+    - clam
+    - clams
+    - oyster
+    - oysters
+    - mussel
+    - mussels
+    - shellfish
+    - crustacean
+    - krill
+    - barnacle
+
+tree_nuts:
+  label: Tree nuts
+  keywords:
+    - almond
+    - almonds
+    - brazil nut
+    - brazil nuts
+    - cashew
+    - cashews
+    - hazelnut
+    - hazelnuts
+    - filbert
+    - macadamia
+    - pecan
+    - pecans
+    - pine nut
+    - pine nuts
+    - pistachio
+    - pistachios
+    - walnut
+    - walnuts
+    - chestnut
+    - chestnuts
+    - marzipan
+    - praline
+    - nougat
+    - tree nut
+    - tree nuts
+
+peanuts:
+  label: Peanuts
+  keywords:
+    - peanut
+    - peanuts
+    - arachis
+    - groundnut
+    - groundnuts
+
+wheat:
+  label: Wheat / gluten (wheat)
+  keywords:
+    - wheat
+    - wheat flour
+    - semolina
+    - durum
+    - bulgur
+    - farina
+    - couscous
+    - gluten
+    - spelt
+    - kamut
+    - triticale
+    - einkorn
+
+soy:
+  label: Soy
+  keywords:
+    - soy
+    - soya
+    - soybean
+    - soybeans
+    - tofu
+    - edamame
+    - miso
+    - tempeh
+    - soy lecithin
+    - soy protein
+    - soy flour
+    - soy sauce
+    - tamari
+
+sesame:
+  label: Sesame
+  keywords:
+    - sesame
+    - tahini
+    - halvah
+    - halva
+    - benne
