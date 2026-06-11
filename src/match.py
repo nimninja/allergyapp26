@@ -42,7 +42,83 @@ def _load_yaml(path: Path) -> dict[str, Any]:
         return yaml.safe_load(f) or {}
 
 
-def _find_keyword_in_normalized(normalized: str, keyword: str) -> bool:
+def _load_matching_rules(rules_dir: Path) -> tuple[dict[str, str], dict[str, list[str]]]:
+    data = _load_yaml(rules_dir / "matching.yaml")
+    fixes_raw = data.get("ocr_token_fixes") or {}
+    syn_raw = data.get("synonyms") or {}
+    fixes = {str(k).lower(): str(v).lower() for k, v in fixes_raw.items()}
+    synonyms: dict[str, list[str]] = {}
+    for key, value in syn_raw.items():
+        if isinstance(value, list):
+            synonyms[str(key).lower()] = [str(v) for v in value if isinstance(v, str)]
+    return fixes, synonyms
+
+
+def normalize_text_with_fixes(text: str, ocr_fixes: dict[str, str]) -> str:
+    base = normalize_text(text)
+    if not base or not ocr_fixes:
+        return base
+    return " ".join(ocr_fixes.get(token, token) for token in base.split()).strip()
+
+
+def _find_keyword_match(
+    raw_normalized: str,
+    fixed_normalized: str,
+    keyword: str,
+    *,
+    ocr_fixes: dict[str, str],
+    synonyms: dict[str, list[str]] | None = None,
+) -> dict[str, str] | None:
+    kw = keyword.strip().lower()
+    if not kw:
+        return None
+
+    if _find_keyword_exact(raw_normalized, kw):
+        return {
+            "method": "direct",
+            "matched_text": kw,
+            "detail": "Exact match in label text",
+        }
+
+    if _find_keyword_exact(fixed_normalized, kw) and not _find_keyword_exact(raw_normalized, kw):
+        if " " not in kw:
+            for token in raw_normalized.split():
+                if ocr_fixes.get(token) == kw:
+                    return {
+                        "method": "ocr_fix",
+                        "matched_text": token,
+                        "detail": f'OCR fix: "{token}" → "{kw}"',
+                    }
+        return {
+            "method": "ocr_fix",
+            "matched_text": kw,
+            "detail": "Matched after OCR token cleanup",
+        }
+
+    if _find_keyword_exact(fixed_normalized, kw):
+        return {
+            "method": "direct",
+            "matched_text": kw,
+            "detail": "Exact match in label text",
+        }
+
+    for phrase in (synonyms or {}).get(kw, []):
+        phrase_norm = phrase.strip().lower()
+        if not phrase_norm:
+            continue
+        if _find_keyword_exact(raw_normalized, phrase_norm) or _find_keyword_exact(
+            fixed_normalized, phrase_norm
+        ):
+            return {
+                "method": "synonym",
+                "matched_text": phrase_norm,
+                "detail": f'Synonym phrase for "{kw}"',
+            }
+
+    return None
+
+
+def _find_keyword_exact(normalized: str, keyword: str) -> bool:
     kw = keyword.strip().lower()
     if not kw:
         return False
@@ -87,7 +163,9 @@ def match_text(
     vegetarian: bool,
     extra_avoid: list[str],
 ) -> MatchResult:
-    normalized = normalize_text(raw_text)
+    ocr_fixes, synonyms = _load_matching_rules(rules_dir)
+    raw_normalized = normalize_text(raw_text)
+    normalized = normalize_text_with_fixes(raw_text, ocr_fixes)
     violations: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
     may_contain_notices = _collect_may_contain(raw_text)
@@ -100,12 +178,29 @@ def match_text(
     seen_pairs: set[tuple[str, str]] = set()
     seen_warning_terms: set[str] = set()
 
-    def add_violation(category: str, keyword: str) -> None:
+    def add_violation(category: str, keyword: str, match: dict[str, str]) -> None:
         key = (category, keyword)
         if key in seen_pairs:
             return
         seen_pairs.add(key)
-        violations.append({"category": category, "keyword": keyword})
+        violations.append(
+            {
+                "category": category,
+                "keyword": keyword,
+                "match_method": match["method"],
+                "matched_text": match["matched_text"],
+                "match_detail": match["detail"],
+            }
+        )
+
+    def matches(kw: str) -> dict[str, str] | None:
+        return _find_keyword_match(
+            raw_normalized,
+            normalized,
+            kw,
+            ocr_fixes=ocr_fixes,
+            synonyms=synonyms,
+        )
 
     # Allergens
     for allergen_id in selected_allergens:
@@ -114,21 +209,21 @@ def match_text(
             continue
         label = entry.get("label", allergen_id)
         for kw in entry.get("keywords", []):
-            if isinstance(kw, str) and _find_keyword_in_normalized(normalized, kw):
-                add_violation(f"Allergen: {label}", kw)
+            if isinstance(kw, str) and (hit := matches(kw)):
+                add_violation(f"Allergen: {label}", kw, hit)
 
     # Vegan
     if vegan:
         for kw in vegan_data.get("violation_keywords", []):
-            if isinstance(kw, str) and _find_keyword_in_normalized(normalized, kw):
-                add_violation("Vegan", kw)
+            if isinstance(kw, str) and (hit := matches(kw)):
+                add_violation("Vegan", kw, hit)
         for item in ambiguous_data.get("vegan_ambiguous", []):
             if isinstance(item, dict):
                 term = item.get("term", "")
                 reason = item.get("reason", "Ambiguous on labels; verify source.")
             else:
                 term, reason = str(item), "Ambiguous on labels; verify source."
-            if term and _find_keyword_in_normalized(normalized, term):
+            if term and matches(term):
                 if term not in seen_warning_terms:
                     seen_warning_terms.add(term)
                     warnings.append({"term": term, "reason": reason})
@@ -136,23 +231,23 @@ def match_text(
     # Vegetarian
     if vegetarian:
         for kw in vegetarian_data.get("violation_keywords", []):
-            if isinstance(kw, str) and _find_keyword_in_normalized(normalized, kw):
-                add_violation("Vegetarian", kw)
+            if isinstance(kw, str) and (hit := matches(kw)):
+                add_violation("Vegetarian", kw, hit)
         for item in ambiguous_data.get("vegetarian_ambiguous", []):
             if isinstance(item, dict):
                 term = item.get("term", "")
                 reason = item.get("reason", "May or may not be animal-derived.")
             else:
                 term, reason = str(item), "May or may not be animal-derived."
-            if term and _find_keyword_in_normalized(normalized, term):
+            if term and matches(term):
                 if term not in seen_warning_terms:
                     seen_warning_terms.add(term)
                     warnings.append({"term": term, "reason": reason})
 
     # User-supplied terms (treat as violations when matched)
     for term in extra_avoid:
-        if _find_keyword_in_normalized(normalized, term):
-            add_violation(f"Custom avoid: {term}", term)
+        if hit := matches(term):
+            add_violation(f"Custom avoid: {term}", term, hit)
 
     return MatchResult(
         raw_text=raw_text,

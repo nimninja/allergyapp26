@@ -1,0 +1,81 @@
+# OCR misreads and synonym phrases for offline matching (no fuzzy edit-distance).
+# Token fixes run during normalization; synonyms extend keyword checks.
+
+ocr_token_fixes:
+  protien: protein
+  proten: protein
+  protine: protein
+  glutan: gluten
+  glutn: gluten
+  glueten: gluten
+  gluetin: gluten
+  whev: whey
+  vvhey: whey
+  rnilk: milk
+  mllk: milk
+  penaut: peanut
+  penauts: peanuts
+  peanul: peanut
+  sesam: sesame
+  seseme: sesame
+  cashevv: cashew
+  egs: eggs
+  eqqs: eggs
+  albumen: albumin
+  laktose: lactose
+  caseine: casein
+  sov: soy
+  onoin: onion
+  oni0n: onion
+  garlc: garlic
+
+synonyms:
+  whey:
+    - whey protein
+    - whey powder
+    - sweet whey
+    - whey protein concentrate
+  casein:
+    - sodium caseinate
+    - milk casein
+    - calcium caseinate
+  ghee:
+    - clarified butter
+  gluten:
+    - wheat gluten
+    - vital wheat gluten
+    - gluten flour
+  milk:
+    - skim milk
+    - whole milk
+    - nonfat milk
+  egg:
+    - egg white
+    - egg yolk
+  eggs:
+    - egg white
+    - egg yolk
+    - dried egg
+  peanut:
+    - peanut butter
+    - groundnut
+  peanuts:
+    - peanut butter
+    - groundnuts
+  soy:
+    - soya
+    - soybean
+    - soy bean
+  sesame:
+    - tahini
+  onion:
+    - onion powder
+    - dried onion
+  garlic:
+    - garlic powder
+    - dried garlic
+  honey:
+    - bee honey
+  gelatin:
+    - gelatine
+    - hydrolyzed collagen

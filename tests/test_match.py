@@ -102,3 +102,73 @@ def test_word_boundary_egg_not_in_veggie(rules_dir: Path) -> None:
         extra_avoid=[],
     )
     assert r.violations == []
+
+
+def test_ocr_typo_glutan_matches_gluten(rules_dir: Path) -> None:
+    text = "Ingredients: rice flour, glutan, salt."
+    r = match_text(
+        text,
+        rules_dir=rules_dir,
+        selected_allergens=[],
+        vegan=False,
+        vegetarian=False,
+        extra_avoid=["gluten"],
+    )
+    assert any("gluten" in v["keyword"].lower() for v in r.violations)
+
+
+def test_ocr_typo_whey_still_matches_milk_allergen(rules_dir: Path) -> None:
+    text = "Contains whev and sugar."
+    r = match_text(
+        text,
+        rules_dir=rules_dir,
+        selected_allergens=["milk"],
+        vegan=False,
+        vegetarian=False,
+        extra_avoid=[],
+    )
+    assert any("Milk" in v["category"] for v in r.violations)
+
+
+def test_synonym_clarified_butter_matches_ghee(rules_dir: Path) -> None:
+    text = "Ingredients: clarified butter, salt."
+    r = match_text(
+        text,
+        rules_dir=rules_dir,
+        selected_allergens=["milk"],
+        vegan=False,
+        vegetarian=False,
+        extra_avoid=["ghee"],
+    )
+    assert any("ghee" in v["keyword"].lower() for v in r.violations)
+
+
+def test_ocr_penauts_matches_peanut_via_preset(rules_dir: Path) -> None:
+    text = "May contain penauts and tree nuts."
+    r = match_text(
+        text,
+        rules_dir=rules_dir,
+        selected_allergens=["peanuts"],
+        vegan=False,
+        vegetarian=False,
+        extra_avoid=[],
+    )
+    assert any("peanut" in v["keyword"].lower() for v in r.violations)
+    hit = next(v for v in r.violations if "peanut" in v["keyword"].lower())
+    assert hit["match_method"] == "ocr_fix"
+    assert hit["matched_text"] == "penauts"
+
+
+def test_ocr_fix_reports_method(rules_dir: Path) -> None:
+    text = "Ingredients: glutan, salt."
+    r = match_text(
+        text,
+        rules_dir=rules_dir,
+        selected_allergens=[],
+        vegan=False,
+        vegetarian=False,
+        extra_avoid=["gluten"],
+    )
+    hit = next(v for v in r.violations if v["keyword"] == "gluten")
+    assert hit["match_method"] == "ocr_fix"
+    assert hit["matched_text"] == "glutan"

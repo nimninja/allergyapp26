@@ -29,6 +29,7 @@ class LocalScanService(context: Context) {
         return ScanResponse(
             rawText = result.rawText,
             normalized = result.normalized,
+            normalizedRaw = result.normalizedRaw,
             violations = result.violations,
             warnings = result.warnings,
             mayContainNotices = result.mayContainNotices,

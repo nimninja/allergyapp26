@@ -1,18 +1,20 @@
 package com.ingredientchecker.app.domain
 
+import com.ingredientchecker.app.data.MatchingRules
 import com.ingredientchecker.app.data.RulesRepository
 import com.ingredientchecker.app.data.Violation
 import com.ingredientchecker.app.data.Warning
 
 data class MatchResult(
     val rawText: String,
+    val normalizedRaw: String,
     val normalized: String,
     val violations: List<Violation>,
     val warnings: List<Warning>,
     val mayContainNotices: List<String>,
 )
 
-/** Port of src/match.py — same keyword logic as desktop/API. */
+/** Port of src/match.py — keyword logic with OCR fixes and synonyms. */
 class RuleMatcher(private val rules: RulesRepository) {
 
     fun matchText(
@@ -22,19 +24,32 @@ class RuleMatcher(private val rules: RulesRepository) {
         vegetarian: Boolean,
         extraAvoid: List<String>,
     ): MatchResult {
-        val normalized = normalizeText(rawText)
+        val matching = rules.matchingRules()
+        val rawNormalized = RuleMatcher.normalizeText(rawText)
+        val normalized = FuzzyMatcher.applyOcrFixes(rawNormalized, matching)
         val violations = mutableListOf<Violation>()
         val warnings = mutableListOf<Warning>()
         val mayContain = collectMayContain(rawText)
         val seenPairs = mutableSetOf<Pair<String, String>>()
         val seenWarningTerms = mutableSetOf<String>()
 
-        fun addViolation(category: String, keyword: String) {
+        fun addViolation(category: String, keyword: String, match: KeywordMatch) {
             val key = category to keyword
             if (key in seenPairs) return
             seenPairs.add(key)
-            violations.add(Violation(category, keyword))
+            violations.add(
+                Violation(
+                    category = category,
+                    keyword = keyword,
+                    matchMethod = match.method.id,
+                    matchedText = match.matchedText,
+                    matchDetail = match.detail,
+                ),
+            )
         }
+
+        fun matches(keyword: String): KeywordMatch? =
+            FuzzyMatcher.findKeywordMatch(rawNormalized, normalized, keyword, matching)
 
         val allergensData = rules.allergensData()
         for (allergenId in selectedAllergens) {
@@ -43,8 +58,8 @@ class RuleMatcher(private val rules: RulesRepository) {
             @Suppress("UNCHECKED_CAST")
             val keywords = entry["keywords"] as? List<Any> ?: emptyList()
             for (kw in keywords) {
-                if (kw is String && findKeywordInNormalized(normalized, kw)) {
-                    addViolation("Allergen: $label", kw)
+                if (kw is String) {
+                    matches(kw)?.let { addViolation("Allergen: $label", kw, it) }
                 }
             }
         }
@@ -53,13 +68,15 @@ class RuleMatcher(private val rules: RulesRepository) {
             @Suppress("UNCHECKED_CAST")
             val keywords = rules.veganData()["violation_keywords"] as? List<Any> ?: emptyList()
             for (kw in keywords) {
-                if (kw is String && findKeywordInNormalized(normalized, kw)) {
-                    addViolation("Vegan", kw)
+                if (kw is String) {
+                    matches(kw)?.let { addViolation("Vegan", kw, it) }
                 }
             }
             addAmbiguousWarnings(
                 rules.ambiguousData()["vegan_ambiguous"],
+                rawNormalized,
                 normalized,
+                matching,
                 "Ambiguous on labels; verify source.",
                 warnings,
                 seenWarningTerms,
@@ -70,13 +87,15 @@ class RuleMatcher(private val rules: RulesRepository) {
             @Suppress("UNCHECKED_CAST")
             val keywords = rules.vegetarianData()["violation_keywords"] as? List<Any> ?: emptyList()
             for (kw in keywords) {
-                if (kw is String && findKeywordInNormalized(normalized, kw)) {
-                    addViolation("Vegetarian", kw)
+                if (kw is String) {
+                    matches(kw)?.let { addViolation("Vegetarian", kw, it) }
                 }
             }
             addAmbiguousWarnings(
                 rules.ambiguousData()["vegetarian_ambiguous"],
+                rawNormalized,
                 normalized,
+                matching,
                 "May or may not be animal-derived.",
                 warnings,
                 seenWarningTerms,
@@ -84,17 +103,17 @@ class RuleMatcher(private val rules: RulesRepository) {
         }
 
         for (term in extraAvoid) {
-            if (findKeywordInNormalized(normalized, term)) {
-                addViolation("Custom avoid: $term", term)
-            }
+            matches(term)?.let { addViolation("Custom avoid: $term", term, it) }
         }
 
-        return MatchResult(rawText, normalized, violations, warnings, mayContain)
+        return MatchResult(rawText, rawNormalized, normalized, violations, warnings, mayContain)
     }
 
     private fun addAmbiguousWarnings(
         items: Any?,
+        rawNormalized: String,
         normalized: String,
+        matching: MatchingRules,
         defaultReason: String,
         warnings: MutableList<Warning>,
         seen: MutableSet<String>,
@@ -109,7 +128,10 @@ class RuleMatcher(private val rules: RulesRepository) {
                 }
                 else -> item.toString() to defaultReason
             }
-            if (term.isNotEmpty() && findKeywordInNormalized(normalized, term) && term !in seen) {
+            if (term.isNotEmpty() &&
+                FuzzyMatcher.findKeywordMatch(rawNormalized, normalized, term, matching) != null &&
+                term !in seen
+            ) {
                 seen.add(term)
                 warnings.add(Warning(term, reason))
             }

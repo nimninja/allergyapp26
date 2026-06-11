@@ -45,6 +45,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,9 +66,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ingredientchecker.app.data.AllergenOption
+import com.ingredientchecker.app.data.DietProfile
 import com.ingredientchecker.app.data.ScanResponse
+import com.ingredientchecker.app.data.UserRestrictions
 import com.ingredientchecker.app.data.Violation
 import com.ingredientchecker.app.data.Warning
+import com.ingredientchecker.app.domain.DietProfileResolver
+import com.ingredientchecker.app.domain.MatchMethod
 import com.ingredientchecker.app.ui.theme.AuraDarkGradientBottom
 import com.ingredientchecker.app.ui.theme.AuraDarkGradientTop
 import com.ingredientchecker.app.ui.theme.AuraEmerald
@@ -119,14 +125,12 @@ fun MainScreen(
 
             RestrictionsSection(
                 allergens = state.allergens,
-                selectedAllergens = state.restrictions.selectedAllergens,
-                vegan = state.restrictions.vegan,
-                vegetarian = state.restrictions.vegetarian,
-                extraAvoid = state.restrictions.extraAvoid,
+                dietProfiles = state.dietProfiles,
+                restrictions = state.restrictions,
                 disclaimer = state.disclaimer,
                 onToggleAllergen = viewModel::toggleAllergen,
-                onVeganChange = viewModel::setVegan,
-                onVegetarianChange = viewModel::setVegetarian,
+                onToggleProfile = viewModel::toggleProfile,
+                onProfileToggle = viewModel::setProfileToggle,
                 onExtraAvoidChange = viewModel::setExtraAvoid,
             )
 
@@ -248,19 +252,68 @@ private fun AuraCard(
 @Composable
 private fun RestrictionsSection(
     allergens: List<AllergenOption>,
-    selectedAllergens: Set<String>,
-    vegan: Boolean,
-    vegetarian: Boolean,
-    extraAvoid: String,
+    dietProfiles: List<DietProfile>,
+    restrictions: UserRestrictions,
     disclaimer: String,
     onToggleAllergen: (String, Boolean) -> Unit,
-    onVeganChange: (Boolean) -> Unit,
-    onVegetarianChange: (Boolean) -> Unit,
+    onToggleProfile: (String) -> Unit,
+    onProfileToggle: (String, String, Boolean) -> Unit,
     onExtraAvoidChange: (String) -> Unit,
 ) {
+    var expandedProfileId by remember { mutableStateOf<String?>(null) }
+
     AuraCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SectionTitle("Your restrictions")
+
+            Text(
+                "Diet profiles",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "Tap a profile, then expand to customize what it checks for.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                dietProfiles.forEach { profile ->
+                    val selected = profile.id in restrictions.activeProfiles
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            val wasSelected = selected
+                            onToggleProfile(profile.id)
+                            expandedProfileId = when {
+                                wasSelected -> if (expandedProfileId == profile.id) null else expandedProfileId
+                                else -> profile.id
+                            }
+                        },
+                        label = { Text(profile.label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AuraEmerald,
+                            selectedLabelColor = Color.White,
+                        ),
+                    )
+                }
+            }
+
+            restrictions.activeProfiles.forEach { profileId ->
+                dietProfiles.find { it.id == profileId }?.let { profile ->
+                    ProfileDetailPanel(
+                        profile = profile,
+                        restrictions = restrictions,
+                        expanded = expandedProfileId == profile.id,
+                        onExpandClick = {
+                            expandedProfileId = if (expandedProfileId == profile.id) null else profile.id
+                        },
+                        onProfileToggle = onProfileToggle,
+                    )
+                }
+            }
 
             Text(
                 "Allergens",
@@ -272,7 +325,7 @@ private fun RestrictionsSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 allergens.forEach { allergen ->
-                    val selected = allergen.id in selectedAllergens
+                    val selected = allergen.id in restrictions.selectedAllergens
                     FilterChip(
                         selected = selected,
                         onClick = { onToggleAllergen(allergen.id, !selected) },
@@ -297,37 +350,8 @@ private fun RestrictionsSection(
                 }
             }
 
-            Text(
-                "Diet",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChip(
-                    selected = vegan,
-                    onClick = { onVeganChange(!vegan) },
-                    label = { Text("Vegan") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AuraEmerald,
-                        selectedLabelColor = Color.White,
-                    ),
-                )
-                FilterChip(
-                    selected = vegetarian,
-                    onClick = { onVegetarianChange(!vegetarian) },
-                    label = { Text("Vegetarian") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AuraEmerald,
-                        selectedLabelColor = Color.White,
-                    ),
-                )
-            }
-
             OutlinedTextField(
-                value = extraAvoid,
+                value = restrictions.extraAvoid,
                 onValueChange = onExtraAvoidChange,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Also avoid") },
@@ -346,6 +370,164 @@ private fun RestrictionsSection(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProfileDetailPanel(
+    profile: DietProfile,
+    restrictions: UserRestrictions,
+    expanded: Boolean,
+    onExpandClick: () -> Unit,
+    onProfileToggle: (String, String, Boolean) -> Unit,
+) {
+    val details = DietProfileResolver.resolvedDetails(
+        profile = profile,
+        profileToggles = restrictions.profileToggles,
+        allergenLabel = { id ->
+            com.ingredientchecker.app.domain.AppConstants.ALLERGEN_OPTIONS
+                .find { it.first == id }?.second ?: id
+        },
+    )
+
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        profile.label,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (profile.description.isNotBlank()) {
+                        Text(
+                            profile.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                TextButton(onClick = onExpandClick) {
+                    Icon(
+                        if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (profile.includes.isNotEmpty()) {
+                        Text(
+                            "Includes",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        profile.includes.forEach { line ->
+                            BulletItem(line)
+                        }
+                    }
+
+                    if (details.activeAllergenLabels.isNotEmpty()) {
+                        Text(
+                            "Allergen checks active",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            details.activeAllergenLabels.forEach { label ->
+                                Surface(
+                                    shape = MaterialTheme.shapes.small,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                ) {
+                                    Text(
+                                        label,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (details.activeKeywords.isNotEmpty()) {
+                        Text(
+                            "Keyword checks active",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            details.activeKeywords.joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+
+                    if (details.effect.vegan || details.effect.vegetarian) {
+                        val flags = buildList {
+                            if (details.effect.vegan) add("Vegan rules")
+                            if (details.effect.vegetarian) add("Vegetarian rules")
+                        }
+                        Text(
+                            flags.joinToString(" · "),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AuraEmerald,
+                        )
+                    }
+
+                    if (profile.toggles.isNotEmpty()) {
+                        Text(
+                            "Customize",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        profile.toggles.forEach { toggle ->
+                            val on = details.toggleStates[toggle.id] ?: toggle.default
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                    Text(toggle.label, style = MaterialTheme.typography.bodyMedium)
+                                    if (toggle.description.isNotBlank()) {
+                                        Text(
+                                            toggle.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                                Switch(
+                                    checked = on,
+                                    onCheckedChange = { enabled ->
+                                        onProfileToggle(profile.id, toggle.id, enabled)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = AuraEmerald,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -537,7 +719,11 @@ private fun ScanResultCard(result: ScanResponse) {
                 }
             }
 
-            OcrExpandable(rawText = result.rawText)
+            OcrExpandable(
+                rawText = result.rawText,
+                normalizedRaw = result.normalizedRaw,
+                normalized = result.normalized,
+            )
         }
     }
 }
@@ -592,18 +778,62 @@ private fun BulletItem(text: String) {
 private fun ViolationItem(violation: Violation) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("•", color = AuraError)
-        Column {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    violation.category,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                violation.matchMethod?.let { methodId ->
+                    MatchMethodBadge(methodId)
+                }
+            }
             Text(
-                violation.category,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                "“${violation.keyword}”",
+                "Rule keyword: “${violation.keyword}”",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
+            if (!violation.matchedText.isNullOrBlank() &&
+                violation.matchedText != violation.keyword &&
+                violation.matchMethod != MatchMethod.DIRECT.id
+            ) {
+                Text(
+                    "Detected in label: “${violation.matchedText}”",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            violation.matchDetail?.let { detail ->
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun MatchMethodBadge(methodId: String) {
+    val method = MatchMethod.fromId(methodId)
+    val (bg, fg) = when (method) {
+        MatchMethod.DIRECT -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+        MatchMethod.OCR_FIX -> AuraWarningContainer to AuraWarning
+        MatchMethod.SYNONYM -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        null -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(shape = MaterialTheme.shapes.small, color = bg) {
+        Text(
+            method?.label ?: methodId,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = fg,
+        )
     }
 }
 
@@ -623,7 +853,11 @@ private fun WarningItem(warning: Warning) {
 }
 
 @Composable
-private fun OcrExpandable(rawText: String) {
+private fun OcrExpandable(
+    rawText: String,
+    normalizedRaw: String?,
+    normalized: String,
+) {
     var expanded by remember { mutableStateOf(false) }
 
     Column {
@@ -645,16 +879,35 @@ private fun OcrExpandable(rawText: String) {
             )
         }
         AnimatedVisibility(visible = expanded) {
-            Text(
-                rawText.ifBlank { "(no text detected)" },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
                     .padding(12.dp),
-            )
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Raw OCR", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    rawText.ifBlank { "(no text detected)" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (!normalizedRaw.isNullOrBlank() && normalizedRaw != normalized) {
+                    Text("Before OCR fixes", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        normalizedRaw,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text("After OCR fixes", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        normalized,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

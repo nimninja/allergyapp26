@@ -6,6 +6,7 @@ Native app with **on-device OCR (ML Kit)** and **bundled YAML rules** — works 
 
 ```text
 Camera / Gallery → ML Kit OCR (on phone) → local rules (assets/rules/) → results
+Diet profile chips (Jain, Satvik, gluten-free, …) with expandable customization
 ```
 
 - No internet required to scan labels
@@ -24,6 +25,8 @@ When you change YAML in `data/rules/`, copy to Android assets:
 ```powershell
 Copy-Item data\rules\* android\app\src\main\assets\rules\ -Force
 ```
+
+Includes `profiles.yaml` for diet profile chips.
 
 Then rebuild the app.
 

@@ -1,0 +1,198 @@
+# Predefined diet profiles — bundled in Android assets/rules/profiles.yaml
+# Each profile can set allergens, extra keywords, vegan/vegetarian flags, and user toggles.
+
+profiles:
+  vegetarian:
+    label: Vegetarian
+    description: No meat, fish, or slaughter-derived ingredients. Adjust eggs and dairy to match how you eat.
+    sets_vegetarian: true
+    includes:
+      - Meat & poultry (beef, chicken, pork, lamb…)
+      - Fish & seafood
+      - Gelatin, lard, tallow, rennet, carmine, isinglass
+    toggles:
+      - id: avoid_eggs
+        label: Also avoid eggs
+        description: Turn on if you do not eat eggs (ovo-vegetarian skips this).
+        default: false
+        when_enabled:
+          allergens: [eggs]
+      - id: avoid_dairy
+        label: Also avoid dairy
+        description: Turn on for dairy-free vegetarian (no milk, ghee, paneer, etc.).
+        default: false
+        when_enabled:
+          allergens: [milk]
+
+  vegan:
+    label: Vegan
+    description: No animal products — meat, dairy, eggs, honey, and common animal-derived additives.
+    sets_vegan: true
+    includes:
+      - All meat, fish, dairy, and eggs
+      - Honey, beeswax, gelatin, whey, casein, carmine, shellac
+      - Collagen, keratin, lanolin (vitamin D3)
+    toggles: []
+
+  jain:
+    label: Jain
+    description: Jain vegetarian — no meat, eggs, root vegetables, or alliums (strictness configurable).
+    sets_vegetarian: true
+    allergens: [eggs, fish, shellfish]
+    includes:
+      - Meat, fish, and eggs
+      - Alcohol
+      - Root vegetables & alliums (when strict mode is on)
+      - Dairy & honey (when those toggles are on)
+    extra_avoid:
+      - alcohol
+      - wine
+      - beer
+      - rum
+      - brandy
+      - ethanol
+    toggles:
+      - id: strict_roots
+        label: Avoid root vegetables & alliums
+        description: onion, garlic, potato, carrot, ginger, beet, radish, turmeric, turnip, yam
+        default: true
+        when_enabled:
+          keywords:
+            - onion
+            - onions
+            - garlic
+            - potato
+            - potatoes
+            - carrot
+            - carrots
+            - beet
+            - beets
+            - radish
+            - ginger
+            - turmeric
+            - turnip
+            - yam
+            - sweet potato
+            - shallot
+            - shallots
+            - leek
+            - leeks
+      - id: avoid_dairy
+        label: Also avoid dairy
+        description: Many Jains avoid milk and ghee.
+        default: true
+        when_enabled:
+          allergens: [milk]
+      - id: avoid_honey
+        label: Also avoid honey
+        default: true
+        when_enabled:
+          keywords: [honey]
+
+  satvik:
+    label: Satvik
+    description: Sattvic diet — vegetarian without onion, garlic, or eggs; alcohol excluded.
+    sets_vegetarian: true
+    allergens: [eggs, fish, shellfish]
+    includes:
+      - Meat, fish, and eggs (unless you allow eggs below)
+      - Onion & garlic
+      - Alcohol
+    extra_avoid:
+      - alcohol
+      - wine
+      - beer
+      - onion
+      - onions
+      - garlic
+      - shallot
+      - shallots
+      - leek
+      - leeks
+    toggles:
+      - id: allow_eggs
+        label: Allow eggs
+        description: Some sattvic practitioners include eggs.
+        default: false
+        when_enabled:
+          remove_allergens: [eggs]
+      - id: avoid_dairy
+        label: Also avoid dairy
+        default: false
+        when_enabled:
+          allergens: [milk]
+
+  swaminarayan:
+    label: Swaminarayan
+    description: Lacto-vegetarian without onion, garlic, or eggs (dairy optional).
+    sets_vegetarian: true
+    allergens: [eggs, fish, shellfish, milk]
+    includes:
+      - Meat, fish, and eggs
+      - Onion & garlic
+      - Dairy (unless allowed below)
+      - Alcohol
+    extra_avoid:
+      - alcohol
+      - wine
+      - beer
+      - onion
+      - onions
+      - garlic
+    toggles:
+      - id: allow_dairy
+        label: Allow dairy (milk, ghee, paneer)
+        description: Swaminarayan diet often includes dairy.
+        default: true
+        when_enabled:
+          remove_allergens: [milk]
+
+  gluten_free:
+    label: Gluten-free
+    description: Avoids wheat and common gluten-containing grains and ingredients.
+    allergens: [wheat]
+    includes:
+      - Wheat & gluten (via wheat allergen rules)
+      - Barley, rye, malt, semolina, spelt, triticale
+    extra_avoid:
+      - barley
+      - rye
+      - malt
+      - malt extract
+      - malt flavor
+      - malt flavour
+      - semolina
+      - durum
+      - spelt
+      - triticale
+      - bulgur
+      - farro
+      - seitan
+      - brewer's yeast
+      - brewers yeast
+    toggles: []
+
+  dairy_free:
+    label: Dairy-free
+    description: Avoids milk and dairy-derived ingredients including ghee and paneer.
+    allergens: [milk]
+    includes:
+      - Milk, whey, casein, lactose, butter, cream, cheese, ghee, yogurt
+    toggles: []
+
+  egg_free:
+    label: Egg-free
+    description: Avoids eggs and common egg-derived ingredients.
+    allergens: [eggs]
+    includes:
+      - Eggs, albumin, ovalbumin, mayonnaise, meringue
+    toggles: []
+
+  nut_free:
+    label: Nut-free
+    description: Avoids tree nuts and peanuts.
+    allergens: [tree_nuts, peanuts]
+    includes:
+      - Tree nuts (almond, cashew, walnut, pistachio…)
+      - Peanuts
+    toggles: []

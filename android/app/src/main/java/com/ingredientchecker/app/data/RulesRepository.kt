@@ -47,6 +47,28 @@ class RulesRepository(context: Context) {
         return loaded
     }
 
+    @Synchronized
+    fun matchingRules(): MatchingRules {
+        matching?.let { return it }
+        val loaded = loadMatchingRules()
+        matching = loaded
+        return loaded
+    }
+
+    private var matching: MatchingRules? = null
+
+    private fun loadMatchingRules(): MatchingRules {
+        val data = loadYaml("rules/matching.yaml")
+        @Suppress("UNCHECKED_CAST")
+        val fixes = data["ocr_token_fixes"] as? Map<String, String> ?: emptyMap()
+        @Suppress("UNCHECKED_CAST")
+        val syn = data["synonyms"] as? Map<String, List<String>> ?: emptyMap()
+        return MatchingRules(
+            ocrTokenFixes = fixes.mapKeys { it.key.lowercase() },
+            synonyms = syn.mapKeys { it.key.lowercase() },
+        )
+    }
+
     private fun loadYaml(assetPath: String): Map<String, Any> {
         appContext.assets.open(assetPath).use { stream ->
             @Suppress("UNCHECKED_CAST")

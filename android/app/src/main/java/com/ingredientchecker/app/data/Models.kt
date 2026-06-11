@@ -15,6 +15,9 @@ data class AllergensResponse(
 data class Violation(
     val category: String,
     val keyword: String,
+    @SerializedName("match_method") val matchMethod: String? = null,
+    @SerializedName("matched_text") val matchedText: String? = null,
+    @SerializedName("match_detail") val matchDetail: String? = null,
 )
 
 data class Warning(
@@ -25,6 +28,7 @@ data class Warning(
 data class ScanResponse(
     @SerializedName("raw_text") val rawText: String,
     val normalized: String,
+    @SerializedName("normalized_raw") val normalizedRaw: String? = null,
     val violations: List<Violation>,
     val warnings: List<Warning>,
     @SerializedName("may_contain_notices") val mayContainNotices: List<String>,
